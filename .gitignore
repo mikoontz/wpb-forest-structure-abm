@@ -1,0 +1,7 @@
+*.DS_Store
+.Rproj.user/
+.Rhistory
+abm/MASON/*
+abm/MASON
+abm/MASONex\ v12/*
+abm/MASONex\ v12
