@@ -1,0 +1,97 @@
+---
+output: 
+  pdf_document:
+  template: "ms_carpentry/mjk_ms_template.tex"
+  fig_caption: yes
+  # word_document:
+  #   fig_width: 8
+  #   fig_height: 7
+  #   fig_caption: true
+  #   df_print: kable
+  #   reference_docx: "ms_carpentry/mjk_ms_template_word.docx"
+geometry: margin=1in
+header-includes: 
+- \usepackage{amsmath}
+- \usepackage{graphicx}
+- \usepackage{setspace}
+- \usepackage{mathtools}
+- \usepackage[left]{lineno}
+- \usepackage{booktabs}
+- \usepackage{longtable}
+- \usepackage{makecell}
+- \usepackage{caption}
+- \usepackage{textgreek}
+- \linenumbers
+- \renewcommand\abstractname{\vspace{-1em}}
+# - \captionsetup{width=15cm}
+
+bibliography: "ms_carpentry/wpb-forest-structure-abm.bib"
+csl: https://dl.dropboxusercontent.com/s/3xzxni46ldjzqd1/ecology-letters.csl
+
+title: 'The effect of local forest structure variability on the spatial patterns of western pine beetle-induced tree mortality'
+author:
+  - Michael J. Koontz^1,2^, Jeff C. Schank^3^
+
+date:
+  "^1^Graduate Group in Ecology, University of California, Davis; Davis, CA  \n
+  ^2^Department of Plant Sciences, University of California, Davis; Davis, CA  \n
+  ^3^Department of Psychology, University of California, Davis; Davis, CA  \n"
+
+abstract: "Bark beetles!"
+
+---
+
+\doublespacing
+
+```{r setup, include=FALSE}
+library(here)
+library(readr)
+library(knitr)
+library(kableExtra)
+library(captioner)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+
+fig_nums <- captioner(prefix = "Fig. ")
+table_nums <- captioner(prefix = "Tab. ")
+eq_nums <- captioner(prefix = "Eq. ")
+```
+
+```{r get_references, results = "hide"}
+download.file(url = "https://dl.dropboxusercontent.com/s/n7qvuxhw9cg9kd7/wpb-forest-structure-abm.bib?dl=0", destfile = here::here("docs/manuscript/ms_carpentry/wpb-forest-structure-abm.bib"))
+```
+
+```{r source_analyses, results = "hide"}
+
+```
+
+# Introduction
+
+Aggressive bark beetle species such as the western pine beetle (WPB; Dendroctonus brevicomis) develop into reproductive adults within the inner bark of a single host tree, and thus only interact with the forest spatial environment during their short search for a new host to colonize. To successfully reproduce, WPB must disperse to a potential host, determine that potential hosts’ suitability, and coordinate an attack with enough conspecifics to overcome host defenses (Raffa et al. 2015). Bark beetles are poor dispersers, so their inter-tree dispersal is typically limited to neighbors within a few meters (though long-distance dispersal is possible under some conditions) (Raffa et al. 2015). Lower density forests tend to be less affected by bark beetle mortality, which may be a result of an increased average tree vigor, and thus resistance to attack, in more widely-spaced trees (Negrón and Popp 2004, Fettig et al. 2012). It is also possible that increased resistance of a few, large-diameter trees in thinned plots contributed to decreased initial colonization of a thinned stand, as was reported with the mountain pine beetle attacking thinned lodgepole pine forests (Preisler and Mitchell 1993). An alternative explanation is that large gaps between potential hosts can interrupt the aggregation/anti-aggregation semiochemical landscape that the beetles rely upon to initiate mass attack (Fettig 2012). Furthermore, tree size summaries and average stem density measurements in a forest stand may not capture the rich variation in forest structure to which bark beetles respond (Raffa et al. 2008). Thus, it is unclear how forest structure contributes to bark beetle spread across a landscape.
+
+Approach
+Model
+
+I will build a spatially explicit agent-based model (ABM) based on key bark beetle life history phenomena including: density dependent dispersal, host susceptibility, host selection, pheromone attraction, and density dependent intraspecific competition (Bone and Altaweel 2014). Agent-based approaches enable simulations of biologically meaningful interactions on the scale at which they occur (between the interacting tree and insect agents), and they allow emergent properties of these fine-scale interactions to propagate up into landscape-level phenomena. The model will be parameterized by western pine beetle life history data from the literature, forest structure data from field surveys and the literature, and bark beetle infestation spread from field surveys.
+After parameterizing the model, I will explicitly manipulate the simulated forest structure to represent historic ICO patterns, novel dense conditions, and various “ecotones” of forest structure. I will then “introduce” simulated beetles to a subset of trees to assess how bark beetle spread is affected by various structure conditions at multiple scales. Quantitative spatial patterns of historic and novel Sierra Nevada mixed conifer forests will be simulated to mimic those from Lydersen et al. (2013). From each of 100 simulation runs, the rate of spread and probability of attack in each type of forest condition will be determined.
+
+Field Data for Parameterization
+To parameterize the ABM model, I will assess western pine beetle spread in a ~45 year old ponderosa pine plantation within the Eldorado National Forest. The WPB spread dynamics in a plantation setting represent baseline expectations of WPB activity by providing several controls on tree host and site conditions (e.g., stand species composition, site slope, site aspect, tree age, time series of environmental conditions experienced by the trees, the competitive environment of the trees early in their life). 
+Tree characteristics were measured in an area with an active western pine beetle population (as evidenced by recently killed trees and recently attacked but not yet killed trees). The active populations fall within the Piliken Plantation, which was planted in the years following the Piliken Fire of 1973. For all trees >7.5 cm dbh, I noted the species, dbh, distance to an anchor point, and azimuth to an anchor point. For each tree, I also assessed an “attack score” and a “status score.” The “attack score” measured bark beetle activity on a scale between 0 and 3 representing no bark beetle activity (0), very sparse numbers of bark beetle pitch tubes (1), a moderate number of pitch tubes (2), or very high number of pitch tubes (3). The “status score” measured the tree’s condition on a scale between 0 and 3 representing a dead tree (0), a near-death tree with all brown needles but some turgor pressure in needles (1), a marginal tree with a mix of brown and green needles (2), or a healthy tree with all green needles (3). The year of death was estimated for dead trees based on needle retention (most needles remaining = 2015 death; only a few needles remain = 2014 death, no needles remain and loss of some branches = earlier than 2014 death). For dead trees, bark was removed to determine the agent of mortality. Western pine beetle leaves distinctive galleries (Figure 4). The position of each tree was determined using the distance and azimuth from sequential anchor trees and a stem map was generated (Figure 5). All 800+ trees were resurveyed after 6 weeks to locate new bark beetle activity and detect deteriorating tree conditions.
+
+
+# Methods
+
+## Study system
+
+## Statistical software and data availability
+
+We built the agent-based model using MASON [@Luke2005].
+
+We used `R` for all statistical analyses [@RCoreTeam2018].
+
+# Results
+
+# Discussion
+
+
+
