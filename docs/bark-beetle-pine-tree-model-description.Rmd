@@ -1,0 +1,316 @@
+---
+title: "Agent based model description for bark beetle/pine tree system"
+author: "Michael Koontz and Jeff Schank"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(raster)
+library(spatstat)
+library(tidyverse)
+```
+
+# Introduction
+
+The western pine beetle, aka WPB, (*Dendroctonus brevicomis*) is a species of bark beetle that is capable of attacking and killing live trees. In the Sierra Nevada yellow pine/mixed-conifer region of California, WPB has been implicated in the deaths of many if not most of the 120+ million trees killed in the 2012 to 2016 hot drought-- perhaps the most severe such event in at least 1200 years.
+
+The hottest, driest sites in the Sierra Nevada range were the most susceptible to WPB-induced tree mortality, as were areas with high tree density. Trees are more likely to be water stressed in hot, dry conditions, making them less able to defend against insect attack. High tree density can exacerbate this water stress due to increased local competition for a limited water resource, but high tree density may also directly affect the behavior of the WPB and facilitate their spread. For instance, greater tree density implies a shorter dispersal distance is necessary for the WPB to attack a new potential host. Alternatively, conspecific communication between WPB individuals may be enhanced in denser stand conditions because the plume of chemical communication signals that the WPB produce are be less likely to be dissipated by the wind. Thus, it is unclear exactly how the physical arrangement of trees in the forest affects the spread of WPB, or what scale of tree density is most relevant for understanding their behavior.
+
+We propose to use an agent-based model (aka an individual-based model) to simulate the behavior of the WPB in different forest stand structural conditions. By simulating the activity of biological phenomena at the scale of their interactions-- individual beetle agents making decisions about which potential host trees to attack, and having those agents follow simple rules parameterized by what is known about their life history, we can assess the effect of those life history characteristics and the environmental conditions (e.g., forest structure) on the broader patterns of tree mortality that emerge from the local-scale individual interactions.
+
+# Main Question
+
+How does the spatial arrangement of host trees (including overall density trees as well as their dispersion) in the forest affect the patterns of tree mortality resulting from bark beetle attack? 
+
+# The model
+
+The model comprises three main parts: the environment in which the agents interact, the WPB agents, and the ponderosa pine tree (hosts for the WPB) agents. Each time step represents one day.
+
+We have some data on extent of tree mortality in 36 different ~40 hectare forest stands (~100 acres each). Each of these stands has ~10,000 trees in it, and perhaps 10,000 beetles might attack a single tree at once. Thus, there are a lot of "agents" to keep track of, which may require some clever workarounds to build a model within some constraints defined by the computational power we have available.
+
+The MASON (multi-agent simulation of neighborhoods... or networks... or something) framework (https://cs.gmu.edu/~eclab/projects/mason/) is implemented in Java and it is designed to be very fast (unlike some other agent-based model frameworks). For instance, rather than track 10,000 trees times 10,000 beetles per tree, we track only the beetles that are currently dispersing and then collapse all of the beetle agents that successfully attack a tree into a set of attributes of the tree itself: the number of beetles in the tree, the mean choosiness value of the beetles in the tree, and the standard deviation of choosiness of beetles in the tree. Then, when the next generation of beetle agents needs to be created, the total number and *their* attributes can be defined based on these attributes from the tree.
+
+We build on the HeatBugs program (https://github.com/eclab/mason/tree/master/mason/sim/app/heatbugs) to simulate agents moving in response to a pheromone cue.
+
+## General life history
+
+An adult beetle flies to a potential host tree. The beetle determines whether or not to attack the tree based on how well-defended the tree is and how many other beetles are locally available that can be called in to cooperatively attack the tree. If the beetle decides to attack, it bores into the bark and starts releasing aggregation pheromones that signal to other beetles that a suitable host has been found and that they should come and also attack the tree. If enough beetles arrive to the tree, the tree's defenses are overwhelmed and the attack is successful. For the western pine beetle, attack densities anywhere from 100 to 300 attacks m^-2^ have been reported. A cylindrical tree with 40m of trunk and a diameter of 50cm (a fairly large tree) represents approximately 100 m^2^ of attack surface so perhaps (on the order of) 10,000 beetles may attack a single tree in order to kill it. If not enough beetles arrive to the tree, all the beetles die. Once enough beetles have arrived to the tree to ensure a successful attack, the aggregation pheromones that the beetles release begin to act as an anti-aggregation pheromone and it wards off additional beetles. This ensures that too many beetles don't lay their eggs inside the tree and compete strongly amongst each other for the phloem resources. If the attack is successful, beetles will mate and lay their eggs inside the inner bark where they develop for 6 to 8 weeks. The development time is temperature dependent (warmer temperatures speed up development) and there are some mechanisms in place that synchronize development speed amongst individual eggs/larvae/pupae. The next generation of adult beetles emerge from the inner bark and disperse to a new potential host, leaving the original host tree to die.
+
+## The environment
+
+The environment will be an n x n grid, where each cell is either occupied or not occupied by a ponderosa pine tree host. Each cell can also have an environmental condition that affects the tree's total amount of resin (their inherent vigor and their water stress).
+
+```{r}
+r <- raster(nrow = 100, 
+            ncol = 100, 
+            xmn = 0, 
+            xmx = 50, 
+            ymn = 0, 
+            ymx = 50)
+
+random_spacing <- rpoispp(lambda = 1/5, win = owin(c(0, 50), c(0, 50)))
+regular_spacing <- rMaternII(kappa = 2, 
+                             r = 1.25, 
+                             win = owin(c(0, 50), c(0, 50)))
+clumped_spacing <- rThomas(kappa = 0.005, scale = 2, mu = 40, win = c(c(0, 50), c(0, 50)))
+
+r1 <- rasterize(x = data.frame(random_spacing$x, random_spacing$y), 
+                y = r, 
+                field = 1, 
+                background = 0)
+
+r2 <- rasterize(x = data.frame(regular_spacing$x, regular_spacing$y), 
+                y = r, 
+                field = 1, 
+                background = 0)
+
+r3 <- rasterize(x = data.frame(clumped_spacing$x, clumped_spacing$y), 
+                y = r, 
+                field = 1, 
+                background = 0)
+
+par(mfrow = c(1, 3), mar = c(0, 0, 0, 0)) 
+plot(r1, legend = FALSE, axes = FALSE, asp = 1, box = FALSE)
+plot(r2, legend = FALSE, axes = FALSE, asp = 1, box = FALSE)
+plot(r3, legend = FALSE, axes = FALSE, asp = 1, box = FALSE)
+```
+
+## Global variables
+
+*Pheromone spatial decay kernel*: The decay rate of the effectiveness of the pheromone eminating from each tree. The greater the decay constant, the closer a beetle has to be to a tree to experience the same degree of aggretation or anti-aggregation effect.
+
+*Demographic stochasticity of total resin value (overall vigor) of trees*: Represents the standard deviation of the distribution from which the individual tree vigor values are drawn. Note that the value for the intrinsic tree vigor will be part of the calculation of the total resin value along with the tree size as well as the environmental characteristics of the cell that it occupies.
+
+*Number of beetles to release to the environment during initialization*: Some number of beetles enter the study area
+
+*Probability of a beetle leaving the study area*: With some non-zero probability, beetles will seek trees outside of the study area and will no longer affect the trees in the study area. I think this is a more appropriate choice than using a toroidal surface (where the beetles can move off the left hand side of the environment and reappear on the right hand side)
+
+*Total fat store for each beetle*: Dictates how far they can fly
+
+*Rate of fat store loss per distance travelled*: Dictates how quickly fat stores are depleted for each meter of travel
+
+*Strength of tree crowding effect*: How much does the tree crowding variable for each tree affect that tree's total resin reserves?
+
+*Strength of water stress environmental variable effect*: How much does the water stress environmental variable for each tree affect that tree's total resin reserves?
+
+*Strength of interaction between environmental variable and tree crowding effect*: How much does the interaction between crowdedness and the environmental stressor variables matter? Okay to set this at 0 to start implying there is no interaction (i.e., just an additive effect) of tree crowding and environmental water stress.
+
+*Mean per-capita population growth rate for beetles*: Determines how many new beetles result in the next generation when $N_t$ beetles have successfully colonized a tree. Goes into the logistic equation.
+
+## The agents
+
+### Tree
+
+*Host versus non-host*: The only suitable host for WPB is the ponderosa pine tree (*Pinus ponderosa*). It will be simplest at first to have all trees in the environment be ponderosa pine, but having an ability for some trees to not be ponderosa may allow some interesting iterations of the model in the future (expected dissipation of the pheromone plume based on proximity to a tree of *any* species, not just a host species, to account for wind dynamics around all trees). Additionally, with a random dispersal of beetles to a new tree, some fat stores will be used up by landing on a non-host. This could be important if we dive into random versus chemical-mediated dispersal.
+
+*Tree size*: Some measure of size. Diameter at breast height is typical (approximate range is 10 to 60 cm). Height might be better, since that's what we can measure using the drone. These are mostly interchangeable though.
+
+*Location*: (x, y) coordinates of the tree
+
+*Number of beetles successfully attacking*: The number of beetles that have successfully attacked the tree and whose eggs are developing inside of it.
+
+*Average choosiness of successfully attacking beetles*: The mean value of the choosiness of all of the beetles that successfully attacked the tree. This can be used to randomly generate new choosiness values for the next generation of beetles that emerge from the tree.
+
+*Standard deviation of choosiness of successfully attacking beetles*: Standard deviation of choosiness of all beetles that successfully attacked the tree. This can also be used (along with the mean, above) to randomly generate new choosiness values for the next generation of beetles that emerge from the tree.
+
+*Maximum amount of resin reserves for the tree*: A measure of the tree's inherent vigor. A big, healthy tree has lots of resin reserves that it can use to defend against many attackers. A water stressed tree cannot muster the resin required to ward off attackers.
+
+*Total amount of resin reserves remaining in the tree*: Physically expelling attacking beetles by flushing beetle bore holes with resin is the key defense mechanism of the tree.  But this resin reserve is a limited resource that is tapped each time the tree fends off an attacking beetle. When this resin reserve reaches zero, the tree can no longer defend against attackers.
+
+*Pheromone total*: The amount of chemical signal the tree is giving off as a combination of the water stress it is experiencing as well as the number of beetles that have currently successfully attacked it. 
+
+### Western pine beetle
+
+*Fat stores*: The total remaining amount of fat stores in each individual. This total dictated how far the beetle can fly, and also affects how likely they are to attack the tree they have landed on (i.e., whether they have the luxury to try to find a more suitable host or whether they need to settle for the tree they are on)
+
+*Choosiness*: How discriminating is each beetle in deciding whether to initiate attack on a given tree depending on the pheromone output of that tree. (Alternatively, the relative weight of the tree defenses versus the pheromone communication in making an attack decision [?])
+
+## Initialization
+
+1. Set up the world.
+    i. Add an environmental variable to each cell that will dictate the kind of water stress experienced by a tree there (e.g., long-term climatic water deficit for a site, average temperature/precipitiation)
+    i. Populate with some number of trees in some physical arrangement (random, clustered at different scales, evenly spaced)
+    i. Assign a tree size to each tree (could come from data)
+    i. Assign a tree crowding variable to each tree based on some local measure of crowding (e.g., voronoi polygon area, number of neighbors within X distance)
+    i. Assign a maximum resin level to each tree based on its size, the environmental variable at that cell, the tree's crowding variable, and some demographic stochasticity 
+    i. Set the remaining resin level for each tree to the maximum resin level
+    i. Assign each tree's pheromone output to 0 (alternatively, assign it to a value that also includes the tree's current resin level)
+    i. Assign each tree's current number of beetles to 0
+    i. Assign the mean choosiness of each tree's population of beetles to 0
+    i. Assign the standard deviation of choosiness of each tree's population of beetles to 0
+    
+1. Initial diserpsal of immigrant beetles to the study area
+    i. Randomly disperse the immigrant beetles onto trees
+    i. For each of these beetles, reduce their total fat stores an amount proportional to how far from the edge of the study area the tree is that they landed on. That is, if they had to fly further to get to a tree in the center, that should be reflected in a more decreased fat stores
+
+## Beetle decision process
+
+1. Beetles decide whether to attack the tree based on the following equation
+
+    \begin{equation}
+    \begin{split}
+    y_i \sim & Bernoulli(\theta_i) \\
+    logit(\theta_i) = & \beta_0 + \\
+    & \beta_1 x_{fatStores, i} + \\
+    & \beta_2 x_{treeResin, i} + \\
+    & \beta_3 x_{treePheromone, i} + \beta_4 x_{treePheromone, i}^{2} + \\
+    & \beta_5 x_{choosiness, i}
+    \end{split}
+    \end{equation}
+
+    $\beta_0$ is some intercept representing the logit of the probability that the beetle will initiate attack if all the covariates are 0.
+  
+    $\beta_1$ is the relative effect of each beetle's current fat stores (more likely to attack if fat stores are low). This value will be negative.
+    
+    ```{r}
+    remaining_fat_stores <- seq(0, 1, length.out = 100)
+    pr_attack_fat_stores <- 1 + -1 * remaining_fat_stores
+    plot(x = remaining_fat_stores, 
+         y = pr_attack_fat_stores, 
+         type = "l", 
+         xlim = c(0, 1),
+         ylim = c(0, 1),
+         ylab = "Pr(attack)",
+         xlab = "Remaining fat stores")
+    ```
+    
+    $\beta_2$ is the relative effect of the tree's current level of resin (the tree's current vigor; beetle is more likely to attack if tree has low resin reserves). This value will be negative.
+    
+    ```{r}
+    remaining_tree_resin <- seq(0, 1, length.out = 100)
+    pr_attack_tree_resin <- 1 + -1 * remaining_tree_resin
+    plot(x = remaining_tree_resin, 
+         y = pr_attack_tree_resin, 
+         type = "l", 
+         xlim = c(0, 1),
+         ylim = c(0, 1),
+         ylab = "Pr(attack)",
+         xlab = "Remaining tree resin")
+    ```
+  
+    $\beta_3$ and $\beta_4$ describe the relative effect of the pheromone output from the tree. $\beta_3$ will be positive and $\beta_4$ will be negative. 
+  
+    ```{r}
+    pheromone_output <- seq(0, 1, length.out = 100)
+    pr_attack_pheromone <- 3.5 * pheromone_output + -3.5 * pheromone_output^2
+    
+    plot(x = pheromone_output,
+         y = pr_attack_pheromone, 
+         type = "l", 
+         xlim = c(0, 1),
+         ylim = c(0, 1),
+         ylab = "Pr(attack)",
+         xlab = "Tree's pheromone output")
+    ```
+    
+      $\beta_5$ describes the relative influence of the beetle's choosiness (more likely to attack if the beetle is less choosy). This could potentially be modeled in different way than an additive effect of the overall probability of attack. Perhaps choosiness could be related to how the beetle weights the tree's pheromone output to the tree's current resin level, for instance (this would require decoupling the pheromone value of the tree from the tree's resin level and instead it would just be a function of the number of successfully attacking beetles)
+  
+    ```{r}
+    choosiness <- seq(0, 1, length.out = 100)
+    pr_attack_choosiness <- 1 + -1 * choosiness
+    
+    plot(x = choosiness,
+         y = pr_attack_choosiness, 
+         type = "l", 
+         xlim = c(0, 1),
+         ylim = c(0, 1),
+         ylab = "Pr(attack)",
+         xlab = "Beetle's choosiness")
+    ```
+
+1. Determine whether the attack is successful.
+
+    If the beetle decides to initiate attack, what is the probability that they successfully colonize the tree? This will strictly be a function of the tree's total resin level plus some noise.
+    
+    ```{r}
+    remaining_tree_resin <- seq(0, 1, length.out = 100)
+    pr_success_tree_resin <- 1 + -1 * remaining_tree_resin
+    plot(x = remaining_tree_resin, 
+         y = pr_success_tree_resin, 
+         type = "l", 
+         xlim = c(0, 1),
+         ylim = c(0, 1),
+         ylab = "Pr(successful attack)",
+         xlab = "Remaining tree resin")
+    ```
+
+1. In the event of a successful beetle attack, update some tree and beetle characteristics.
+
+    i. Update the tree's "mean choosiness of successfully attacking beetles" attribute and "standard deviation of choosiness of successfully attacking beetles" attribute. This can be done using the Welford algorithm in order to update these population values as each new beetle arrives.
+    i. Add 1 to the tree's total number of successfully attacking beetles attribute
+    i. Update the tree's resin reserves (substract 1 beetle's worth unless it's already 0)
+    i. Update the tree's total pheromone output (plus 1 beetle's worth)
+
+1. If the attack is not successful
+
+    i. Beetle dies
+    i. Update the tree's resin reserves (subtract 1 beetle's worth)
+
+1. Update the pheromone field.
+
+    The pheromone field is generated by all trees in the environment based on their pheromone output (determined by the number of attacking beetles) and the global "pheromone spatial decay kernel" variable. This is where incorporating some evaporation based on tree spacing might be interesting to account for wind dispersal when gaps between trees are large.
+  
+1. Time step increments to the next day
+
+## The timeline
+
+1. All beetles that didn't initiate attack and that still have fat reserves left will try to fly to another tree.
+
+    i. Beetle dispersal should represent some balance between following the pheromone field (like the "heat" that the heat bugs emit) as well as minimizing dispersal distance to find a potential host. This is another potential avenue for implementing a "choosiness" variable per beetle-- the relative influence of the pheromone field versus the distance to the next tree in deciding where to fly.
+    i. Beetle's fat stores should be updated to reflect the distance traveled.
+    i. Beetle decision process will proceed as described above.
+
+1. Add immigrant beetles to random trees and repeat the beetle decision process described above.
+
+## Tree dynamics
+
+1. If a tree is colonized by some threshold number of beetles within a certain time period, then the tree dies. If that threshold isn't reached in time, then all the beetles inside the tree die.
+
+    i. This seems tricky to implement. Maybe it is best done by not incorporating a successfully colonizing beetle into a tree's "number of successfully attacking beetles" attribute immediately, but rather waiting some period of time to see whether the threshold number is reached? Perhaps there are two "number of successfully attacking beetles" attributes per tree-- one for beetles that are recent attackers and one for beetles that are older attackers. Older attackers die if the threshold number of total attackers isn't reached?
+    i. Another alternative might be to mediate this process through the resin reserves of the tree. That is, each time step we would subtract the "number of successfully attacking beetles" attribute in each tree from the remaining resin reserves and simultaneously kill off that whole population of "successfully attacking beetles" by resetting that attribute to 0. That way, there's a mechanism for the Allee effect (a threshold response of success/failure based on number of beetles attacking). This would require thinking through the pheromone output (e.g., does it decrease immediately if all the beetles in the tree are killed?). 
+    i. Yet a third potential way to implement this is to include another tree attribute: "average age of successfully attacking beetles" that would update as each new day passes (increasing the average by 1) and as new beetles successfully colonize (decreasing the average depending on how many new beetles there are that are 0 days old). Then, there would have to be both a low enough average age and a high enough total number of colonizing beetles.
+
+1. If a tree is successfully overwhelmed by mass attack, the beetles develop inside for some number of days (~42 to 56 days). We could also make this development time related to temperature (develop for some amount of cumulative degree days) by having a time series of temperatures associated with the daily time step progression.
+
+1. Next generation of adult beetles is generated from the tree after development.
+
+    i. When the beetle eggs within a tree have fully developed into the next generation of adults, they emerge from each tree as new agents
+    i. The number of new beetle agents is defined by a population growth equation that can take the "carrying capacity" of the tree into account. That is, if the anti-aggregation phereomone worked properly, beetles should have mostly avoided colonizing a tree that had too many beetles in it
+    i. A logistic growth equation seems reasonable:
+
+    \begin{equation}
+    \begin{split}
+    N_{t+1} = & N_t + rN_t\left(\frac{K - N_t}{K}\right)
+    \end{split}
+    \end{equation}
+    
+      Here, $N_{t+1}$ is the number of adult beetles emerging from the tree, $r$ is the maximum population growth rate (if $r>0$ then the population is growing), $K$ is the carrying capacity of the tree defined as the maximum resin reserves. It is possible that more beetles colonize the tree after resin reserves are depleted, which would begin to suppress the growth rate of the resident beetle population.
+      
+    ```{r logistic_growth}
+    N_t <- seq(1, 10000, length.out = 200)
+    r <- 3
+    K <- 9000
+    
+    N_tp1 <- N_t + r * N_t * ((K - N_t) / K)
+    
+    plot(x = N_t, 
+         y = N_tp1, 
+         type = "l",
+         ylim = c(0, 13000),
+         xlab = expression(N[t]),
+         ylab = expression(N[t+1]))
+    abline(v = K, col = "red")
+    abline(a = 0, b = 1, lty = 2)
+    
+    legend("topleft", 
+           col = 1:2, 
+           legend = c("Population replacement line", 
+                      "Carrying capacity"), 
+           bty = "n", 
+           lty = 2:1)
+    ```
+  
+# Some final thoughts
+
+The visualization of this model through time wouldn't look like beetles dispersing because the beetle dispersal is instantaneous (i.e., not moving to a neighboring cell in each time step but rather jumping directly to a new tree in each time step). Thus, the change in each time step would be most obvious as the changes in the pheromone field as certain trees are colonized. The other obvious change would be trees switching states from "alive" to "dead".
