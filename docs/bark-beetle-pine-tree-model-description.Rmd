@@ -89,8 +89,6 @@ plot(r3, legend = FALSE, axes = FALSE, asp = 1, box = FALSE)
 
 *Rate of beetle immigration to the study area*: Some number of beetles enter the study area. This number will also be used to seed the study area in the initialization step.
 
-*Rate of beetle emigration from the study area*: With some non-zero probability, beetles will seek trees outside of the study area and will no longer affect the trees in the study area. I think this is a more appropriate choice than using a toroidal surface (where the beetles can move off the left hand side of the environment and reappear on the right hand side)
-
 *Total fat store for each beetle*: Dictates total distance they can fly
 
 *Mean per-capita population growth rate for beetles*: Determines how many new beetles result in the next generation when $N_t$ beetles have successfully colonized a tree. Goes into the logistic equation.
@@ -104,6 +102,9 @@ plot(r3, legend = FALSE, axes = FALSE, asp = 1, box = FALSE)
 *Strength of water stress environmental variable effect*: How much does the water stress environmental variable for each tree affect that tree's total resin reserves?
 
 *Strength of interaction between environmental variable and tree crowding effect*: How much does the interaction between crowdedness and the environmental stressor variables matter? Okay to set this at 0 to start implying there is no interaction (i.e., just an additive effect) of tree crowding and environmental water stress.
+
+*Rate of beetle emigration from the study area*: With some non-zero probability, beetles will seek trees outside of the study area and will no longer affect the trees in the study area. I think this is a more appropriate choice than using a toroidal surface (where the beetles can move off the left hand side of the environment and reappear on the right hand side). In the default case, we will incorporate emigration explicitly by "killing off" beetles that try to move beyond the edge of the survey area.
+
 
 ## The agents
 
@@ -139,7 +140,7 @@ plot(r3, legend = FALSE, axes = FALSE, asp = 1, box = FALSE)
 
 *Fat stores*: The total remaining amount of fat stores in each individual. This total dictated how far the beetle can fly, and also affects how likely they are to stop and land on a tree (i.e., whether they have the luxury to try to find a more suitable host or whether they need to settle for the tree they are on)
 
-*Time steps left to live once on a tree*: How many time steps will the beetle live for once it has decided to land on and attack a tree? A beetle can only stay and try to attack a tree for a limited period of time before the tree ultimately succeeds in keeping the beetle out. The life expectancy of the beetle will play a role in whether any given tree's defenses are successfully overwhelmed. That is, we can assess in each time step the total number of beetles that successfully colonized each tree and if it is above some threshold number then the tree will die.
+*Life span left to live once on a tree*: How many time steps will the beetle live for once it has decided to land on and attack a tree? A beetle can only stay and try to attack a tree for a limited period of time before the tree ultimately succeeds in keeping the beetle out. The life expectancy of the beetle will play a role in whether any given tree's defenses are successfully overwhelmed. That is, we can assess in each time step the total number of beetles that successfully colonized each tree and if it is above some threshold number then the tree will die. On the order of a week? That would mean each beetle, once it has landed and attacked a tree, can live to attack a tree for ~1008 time steps.
 
 #### Optional western pine beetle properties
 
@@ -270,13 +271,19 @@ Each time step, a dispersing beetle will: a) die, b) move to a neighboring cell,
     
 1. Time step increments to the next movement period
 
+1. New influx of immigrants to the study area as in the initialization step
+
+1. All beetles that are attacking a tree lose one more time step from their remaining lifespan.
+
+1. All beetles that aren't attacking go through the beetle movement procedure.
+
 ## Tree dynamics
 
-1. If a tree is ever occupied by more beetles than it's maximum resin level, then the tree dies and all the beetles within it reproduce. 
+1. If a tree is ever occupied by more beetles than it's maximum resin level (which we are saying is in units of "beetles"), then the tree dies and all the beetles within it reproduce. 
 
     - Keeping track of the remaining lifespan of each beetle makes this possible relatively easily. Beetles stay "attacking" a tree until their lifespan runs out. If enough beetles in "attacking" status are on a particular tree, then the tree's defenses are overwhelmed. As the beetle's the lifespan runs out, it dies and can no longer contribute to overcoming the strong Allee effect.
 
-1. If a tree is successfully overwhelmed by mass attack, the beetles develop inside for some number of days (~42 to 56 days). *Optional*: We could also make this development time related to temperature (develop for some amount of cumulative degree days) by having a time series of temperatures associated with the time step progression.
+1. If a tree is successfully overwhelmed by mass attack, the beetles develop inside for some number of days (~42 to 56 days; ~6048 to 8064 time steps if each time step is 10 minutes). *Optional*: We could also make this development time related to temperature (develop for some amount of cumulative degree days) by having a time series of temperatures associated with the time step progression.
 
 1. Next generation of adult beetles is generated from the tree after development.
 
