@@ -119,11 +119,11 @@ plot(r3, legend = FALSE, axes = FALSE, asp = 1, box = FALSE)
 
 *Maximum amount of resin reserves for the tree*: A measure of the tree's inherent vigor. A big, healthy tree has lots of resin reserves that it can use to defend against many attackers. A water stressed tree cannot muster the resin required to ward off attackers. This will also essentially be the carrying capacity, $K$, for the logistic growth of the population of beetles that successfully attacked the tree
 
-*Total amount of resin reserves remaining in the tree*: Physically expelling attacking beetles by flushing beetle bore holes with resin is the key defense mechanism of the tree.  But this resin reserve is a limited resource that is tapped each time the tree fends off an attacking beetle. When this resin reserve reaches zero, the tree can no longer defend against attackers.
-
 *Pheromone total*: The amount of chemical signal the tree is giving off as a combination of the water stress it is experiencing as well as the number of beetles that have currently successfully attacked it. 
 
 #### Optional tree properties
+
+*Total amount of resin reserves remaining in the tree*: Physically expelling attacking beetles by flushing beetle bore holes with resin is the key defense mechanism of the tree.  But this resin reserve is a limited resource that is tapped each time the tree fends off an attacking beetle. When this resin reserve reaches zero, the tree can no longer defend against attackers. If this property is not included, then the resin reserves implicitly "recharge" as beetles attempting to attack die. If this property is included, then we can fine tune the degree to which the resin reserves recharge in future time steps after attacks by beetles (from a downward ratcheting loss of resin to a rapid recharge)
 
 *Host versus non-host*: The only suitable host for WPB is the ponderosa pine tree (*Pinus ponderosa*). It will be simplest at first to have all trees in the environment be ponderosa pine, but having an ability for some trees to not be ponderosa may allow some interesting iterations of the model in the future (expected dissipation of the pheromone plume based on proximity to a tree of *any* species, not just a host species, to account for wind dynamics around all trees). Additionally, with a random dispersal of beetles to a new tree, some fat stores will be used up by landing on a non-host. This could be important if we dive into random versus chemical-mediated dispersal.
 
