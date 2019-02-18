@@ -25,9 +25,9 @@ How does the spatial arrangement of host trees (including overall density trees 
 
 # The model
 
-Each time step represents an opportunity for beetles to move to a neighboring cell. The beetle in one cell will move to one of that cell's 8 neighbors with some probability. That probability is determined by a combination of the pheromone communication by beetles that have successfully attacked trees and some indicator of each tree's susceptibility (based on their perceived ability to defend against attacks). With some probability, the beetle will decide not to move and will instead search within some radius and land on the nearest tree. The beetle will attack the tree and, if successful, contribute to the pheromone output of the tree. If not successful, the beetle will die. If at any point there are more than $K$ beetles within a given tree, then all the beetles within that tree reproduce. Offspring develop within the tree for some number of time steps equivalent to 6 to 8 weeks and then emerge to find their own hosts leaving the original host tree to die.
+Each time step represents an opportunity for beetles to move to a neighboring cell. The beetle in one cell will move to one of that cell's 8 neighbors with some probability. That probability is determined by a combination of the pheromone communication by beetles that have successfully attacked trees and some indicator of each tree's susceptibility (based on their perceived ability to defend against attacks). With some probability, the beetle will decide not to move and will instead search within some radius and land on a tree within that radius. Depending on how choosy the beetle is, it will land on a random tree or it will land on a tree that is perceived to be weakened (by water stress, for instance). The beetle will attack the tree and, if successful, contribute to the pheromone output of the tree. If not successful, the beetle will die. If at any point there are more than $K$ beetles within a given tree, then all the beetles within that tree reproduce. Offspring develop within the tree for some number of time steps equivalent to 6 to 8 weeks and then emerge to find their own hosts leaving the original host tree to die.
 
-The model comprises four (potentially 5) main parts: the environment in which the agents interact, the WPB agents, the ponderosa pine tree (hosts for the WPB) agents, an environment that describes the phereomone field present during the current time step, and an environment that describes the tree susceptibility field. 
+The model comprises four main parts: the environment in which the agents interact, the WPB agents, the ponderosa pine tree (hosts for the WPB) agents, and an environment that describes the phereomone field present during the current time step, and an environment that describes the tree susceptibility field. 
 
 ## The software
 
@@ -37,7 +37,7 @@ We build on the HeatBugs program (https://github.com/eclab/mason/tree/master/mas
 
 ## Some possible computational constraints
 
-We have some data on extent of tree mortality in 36 different ~40 hectare forest stands (~100 acres each). Each of these stands has ~10,000 trees in it, and perhaps 10,000 beetles might attack a single tree at once. Thus, there are a lot of "agents" to keep track of, which may require some clever workarounds to build a model within some constraints defined by the computational power we have available.
+We have some data on extent of tree mortality in 36 different ~40 hectare forest stands (~100 acres each). Each of these stands has ~10,000 trees in it, and perhaps 10,000 beetles might attack a single tree at once. Thus, there are a lot of "agents" to keep track of, which may require some workarounds to build a model within some constraints defined by the computational power we have available.
 
 ## General life history
 
@@ -87,11 +87,11 @@ plot(r3, legend = FALSE, axes = FALSE, asp = 1, box = FALSE)
 
 *Pheromone spatial decay kernel*: The decay rate of the effectiveness of the pheromone eminating from each tree. The greater the decay constant, the closer a beetle has to be to a tree to experience the same degree of aggretation or anti-aggregation effect.
 
-*Number of beetles to release to the environment during initialization*: Some number of beetles enter the study area
+*Rate of beetle immigration to the study area*: Some number of beetles enter the study area. This number will also be used to seed the study area in the initialization step.
 
-*Probability of a beetle leaving the study area*: With some non-zero probability, beetles will seek trees outside of the study area and will no longer affect the trees in the study area. I think this is a more appropriate choice than using a toroidal surface (where the beetles can move off the left hand side of the environment and reappear on the right hand side)
+*Rate of beetle emigration from the study area*: With some non-zero probability, beetles will seek trees outside of the study area and will no longer affect the trees in the study area. I think this is a more appropriate choice than using a toroidal surface (where the beetles can move off the left hand side of the environment and reappear on the right hand side)
 
-*Total fat store for each beetle*: Dictates how far they can fly
+*Total fat store for each beetle*: Dictates total distance they can fly
 
 *Mean per-capita population growth rate for beetles*: Determines how many new beetles result in the next generation when $N_t$ beetles have successfully colonized a tree. Goes into the logistic equation.
 
@@ -135,28 +135,30 @@ plot(r3, legend = FALSE, axes = FALSE, asp = 1, box = FALSE)
 
 ### Western pine beetle
 
+#### Necessary western pine beetle properties
+
 *Fat stores*: The total remaining amount of fat stores in each individual. This total dictated how far the beetle can fly, and also affects how likely they are to stop and land on a tree (i.e., whether they have the luxury to try to find a more suitable host or whether they need to settle for the tree they are on)
 
-*Choosiness*: How discriminating is each beetle in deciding whether to initiate attack on a given tree depending on the pheromone output of that tree? A super choosy beetle will be less likely to respond to the pheromone cue and stop to go to the nearest tree. A non-choosy beetle will be highly responsive to the pheromone field.
+*Time steps left to live once on a tree*: How many time steps will the beetle live for once it has decided to land on and attack a tree? A beetle can only stay and try to attack a tree for a limited period of time before the tree ultimately succeeds in keeping the beetle out. The life expectancy of the beetle will play a role in whether any given tree's defenses are successfully overwhelmed. That is, we can assess in each time step the total number of beetles that successfully colonized each tree and if it is above some threshold number then the tree will die.
 
-*Time steps left to live*: How many time steps will the beetle live for? This becomes especially important after a beetle has colonized a tree. The beetle will run out of fat stores and die long before it dies because it ran out of time. But the life expectancy of the beetle will play a role in whether any given tree's defenses are successfully overwhelmed. That is, we can assess in each time step the total number of beetles that successfully colonized each tree and if it is above some threshold number then the tree will die.
+#### Optional western pine beetle properties
+
+*Choosiness*: How discriminating is each beetle in deciding whether to initiate attack on a given tree depending on the pheromone output of that tree? A super choosy beetle will be less likely to respond to the pheromone cue and stop to go to the nearest tree. A non-choosy beetle will be highly responsive to the pheromone field.
 
 ## Initialization
 
 1. Set up the world.
     - Populate with some number of trees in some physical arrangement (random, clustered at different scales, evenly spaced)
     - Assign a tree size to each tree (could come from data)
-    - *Optional*: Add an environmental variable to each cell that will dictate the kind of water stress experienced by a tree there (e.g., long-term climatic water deficit for a site, average temperature/precipitiation)
-    - *Optional*: Assign a tree crowding variable to each tree based on some local measure of crowding (e.g., voronoi polygon area, number of neighbors within X distance)
-    - Assign a maximum resin level to each tree based on its size, the environmental variable at that cell, the tree's crowding variable, and some demographic stochasticity 
+    - Assign a maximum resin level to each tree based on its size, the environmental variable at that cell (*optional*), the tree's crowding variable (*optional*), and some demographic stochasticity (*optional*)
     - Set the remaining resin level for each tree to the maximum resin level
     - Assign each tree's pheromone output to 0
-    - Assign each tree's susceptibility output to a value based on its remaining resin level
     - Assign each tree's current number of beetles to 0
+    - Update the pheromone field environment based on the pheromone output of all trees and some diffusion range (will start at 0 for the whole environment)
+    - *Optional*: Add an environmental variable to each cell that will dictate the kind of water stress experienced by a tree there (e.g., long-term climatic water deficit for a site, average temperature/precipitiation)
+    - *Optional*: Assign a tree crowding variable to each tree based on some local measure of crowding (e.g., voronoi polygon area, number of neighbors within X distance)
     - *Optional*: Assign the mean choosiness of each tree's population of beetles to 0
     - *Optional*: Assign the standard deviation of choosiness of each tree's population of beetles to 0
-    - Update the pheromone field environment based on the pheromone output of all trees and some diffusion range (should be starting at 0)
-    - Update the tree susceptibility field environment based on the tree susceptibility output of all trees and some diffusion range
     
 1. Initial diserpsal of immigrant beetles to the study area
     - Randomly disperse the immigrant beetles into the environment
@@ -164,11 +166,11 @@ plot(r3, legend = FALSE, axes = FALSE, asp = 1, box = FALSE)
 
 ## Beetle movement decision process
 
-Each time step, a dispersing beetle will: a) move to a neighboring cell, b) decide to stop and land on a nearby tree, or c) die
+Each time step, a dispersing beetle will: a) move to a neighboring cell, b) decide to stop and search for a nearby tree to land on and attack, or c) die
 
 1. Can the beetle fly further? If the beetle has no remaining fat stores, it cannot fly any further and it dies.
 
-1. Does the beetle stop and land? The beetle will stop and land on a tree to test whether that tree is susceptible to attack with some probability based on:
+1. Does the beetle stop and land? The beetle will stop and land on a tree to attack a tree with some probability based on:
     
     - The beetle's current fat stores (more likely to attack if fat stores are low).
     
@@ -184,8 +186,8 @@ Each time step, a dispersing beetle will: a) move to a neighboring cell, b) deci
            xlab = "Remaining fat stores")
       ```
       
-    - *Optional*: How choosy the beetle is. A more choosy beetle is more discriminating about which trees it will try to attack and will only attack trees that are weakened.
-    - A beetle that decides not to move will land on a random tree within some search radius (if one exists). It could also land on the tree with the most favorable pheromone profile within some search radius. Alternatively, it could land on a tree with probabilities weighted by the pheromone profile favorabilities of the local trees.
+    - *Optional*: How choosy the beetle is. A more choosy beetle is more discriminating about which trees it will try to attack and will only attack trees that are weakened. In this model framework, "weakened" might be best assessed as the maximum resin value of a tree, which incorporates both the inherent tree vigor (bigger trees more vigorous, some demographic stochasticity (*optional*), water stress (*optional*), crowding effects (*optional*)). Use maximum resin level of each tree to not confound the effect of 
+    - A beetle that decides to stop will land on a random tree within some search radius (if a tree exists there). When it lands, start its life expectancy countdown. The beetle only has the equivalent of a week (?) to continue trying to attack a tree before it dies.
 
 ## Beetle attack decision process
 
